@@ -80,6 +80,7 @@ public class QuarkusBootstrap implements Serializable {
     private final boolean disableClasspathCache;
     private final AppModel existingModel;
     private final boolean rebuild;
+    private final Path appClassLocation;
 
     private QuarkusBootstrap(Builder builder) {
         this.applicationRoot = builder.applicationRoot;
@@ -107,6 +108,7 @@ public class QuarkusBootstrap implements Serializable {
         this.disableClasspathCache = builder.disableClasspathCache;
         this.existingModel = builder.existingModel;
         this.rebuild = builder.rebuild;
+        this.appClassLocation = builder.appClassLocation != null ? builder.appClassLocation.normalize() : null;
     }
 
     public CuratedApplication bootstrap() throws BootstrapException {
@@ -135,7 +137,8 @@ public class QuarkusBootstrap implements Serializable {
                 .setAppArtifact(appArtifact)
                 .setManagingProject(managingProject)
                 .setForcedDependencies(forcedDependencies)
-                .setProjectRoot(getProjectRoot());
+                .setProjectRoot(getProjectRoot())
+                .setAppClassLocation(appClassLocation);
         if (mode == Mode.TEST || test) {
             appModelFactory.setTest(true);
             if (!disableClasspathCache) {
@@ -212,6 +215,10 @@ public class QuarkusBootstrap implements Serializable {
         return rebuild;
     }
 
+    public Path getAppClassLocation() {
+        return appClassLocation;
+    }
+
     public static class Builder {
         boolean rebuild;
         PathsCollection applicationRoot;
@@ -238,8 +245,14 @@ public class QuarkusBootstrap implements Serializable {
         List<AppDependency> forcedDependencies = new ArrayList<>();
         boolean disableClasspathCache;
         AppModel existingModel;
+        private Path appClassLocation;
 
         public Builder() {
+        }
+
+        public Builder addAdditionalApplicationArchive(AdditionalDependency path) {
+            additionalApplicationArchives.add(path);
+            return this;
         }
 
         public Builder setApplicationRoot(Path applicationRoot) {
@@ -255,8 +268,8 @@ public class QuarkusBootstrap implements Serializable {
             return this;
         }
 
-        public Builder addAdditionalApplicationArchive(AdditionalDependency path) {
-            additionalApplicationArchives.add(path);
+        public Builder setAppClassLocation(Path appClassLocation) {
+            this.appClassLocation = appClassLocation;
             return this;
         }
 

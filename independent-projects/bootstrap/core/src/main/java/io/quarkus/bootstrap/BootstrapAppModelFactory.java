@@ -8,6 +8,7 @@ import io.quarkus.bootstrap.model.AppModel;
 import io.quarkus.bootstrap.resolver.AppModelResolver;
 import io.quarkus.bootstrap.resolver.AppModelResolverException;
 import io.quarkus.bootstrap.resolver.BootstrapAppModelResolver;
+import io.quarkus.bootstrap.resolver.gradle.BootstrapGradleIdeAppModelProvider;
 import io.quarkus.bootstrap.resolver.maven.BootstrapMavenContext;
 import io.quarkus.bootstrap.resolver.maven.BootstrapMavenContextConfig;
 import io.quarkus.bootstrap.resolver.maven.MavenArtifactResolver;
@@ -56,7 +57,7 @@ public class BootstrapAppModelFactory {
     public static final String CREATOR_APP_TYPE = "creator.app.type";
     public static final String CREATOR_APP_VERSION = "creator.app.version";
 
-    private static final int CP_CACHE_FORMAT_ID = 2;
+    public static final int CP_CACHE_FORMAT_ID = 2;
 
     private static final Logger log = Logger.getLogger(BootstrapAppModelFactory.class);
 
@@ -84,6 +85,8 @@ public class BootstrapAppModelFactory {
 
     private List<AppDependency> forcedDependencies = Collections.emptyList();
 
+    private Path appClassLocation;
+
     private BootstrapAppModelFactory() {
     }
 
@@ -99,6 +102,11 @@ public class BootstrapAppModelFactory {
 
     public BootstrapAppModelFactory setProjectRoot(Path projectRoot) {
         this.projectRoot = projectRoot;
+        return this;
+    }
+
+    public BootstrapAppModelFactory setAppClassLocation(Path appClassLocation) {
+        this.appClassLocation = appClassLocation;
         return this;
     }
 
@@ -221,6 +229,14 @@ public class BootstrapAppModelFactory {
                     log.error("Failed to locate serialized application model at " + serializedModel);
                 }
             }
+            if (test) {
+                // As fallback try to load IntelliJ cached Gradle model,
+                // this is needed when running Unit test in IntelliJ without Gradle runner
+                AppModel appModel = new BootstrapGradleIdeAppModelProvider().getAppModel(appClassLocation);
+                if (appModel != null) {
+                    return new CurationResult(appModel);
+                }
+            }
         }
 
         if (projectRoot != null && !Files.isDirectory(projectRoot)) {
@@ -253,6 +269,7 @@ public class BootstrapAppModelFactory {
                 }
                 workspace = localProject.getWorkspace();
                 cachedCpPath = resolveCachedCpPath(localProject);
+                //<<<<<<< HEAD
                 if (Files.exists(cachedCpPath)
                         && workspace.getLastModified() < Files.getLastModifiedTime(cachedCpPath).toMillis()) {
                     try (DataInputStream reader = new DataInputStream(Files.newInputStream(cachedCpPath))) {
@@ -281,6 +298,12 @@ public class BootstrapAppModelFactory {
                         log.warn("Failed to read deployment classpath cache from " + cachedCpPath + " for "
                                 + appArtifact, e);
                     }
+                    //=======
+                    //                AppModel appModel = tryReadCachedCpPath(appArtifact, cachedCpPath, workspace.getLastModified(),
+                    //                        workspace.getId());
+                    //                if (appModel != null) {
+                    //                    return new CurationResult(appModel);
+                    //>>>>>>> Gradle project now runs with IntelliJ runner
                 }
             }
             CurationResult curationResult = new CurationResult(getAppModelResolver()

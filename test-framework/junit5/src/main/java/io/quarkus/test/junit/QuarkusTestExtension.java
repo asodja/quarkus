@@ -114,7 +114,8 @@ public class QuarkusTestExtension
 
             final QuarkusBootstrap.Builder runnerBuilder = QuarkusBootstrap.builder()
                     .setIsolateDeployment(true)
-                    .setMode(QuarkusBootstrap.Mode.TEST);
+                    .setMode(QuarkusBootstrap.Mode.TEST)
+                    .setAppClassLocation(testClassLocation);
 
             runnerBuilder.setProjectRoot(Paths.get("").normalize().toAbsolutePath());
 

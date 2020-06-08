@@ -27,10 +27,10 @@ import io.quarkus.gradle.tasks.QuarkusAddExtension;
 import io.quarkus.gradle.tasks.QuarkusBuild;
 import io.quarkus.gradle.tasks.QuarkusDev;
 import io.quarkus.gradle.tasks.QuarkusGenerateConfig;
+import io.quarkus.gradle.tasks.QuarkusIdeTestConfigTask;
 import io.quarkus.gradle.tasks.QuarkusListExtensions;
 import io.quarkus.gradle.tasks.QuarkusRemoteDev;
 import io.quarkus.gradle.tasks.QuarkusRemoveExtension;
-import io.quarkus.gradle.tasks.QuarkusTestConfig;
 import io.quarkus.gradle.tasks.QuarkusTestNative;
 
 public class QuarkusPlugin implements Plugin<Project> {
@@ -81,7 +81,7 @@ public class QuarkusPlugin implements Plugin<Project> {
         Task quarkusBuild = tasks.create(QUARKUS_BUILD_TASK_NAME, QuarkusBuild.class);
         Task quarkusDev = tasks.create(QUARKUS_DEV_TASK_NAME, QuarkusDev.class);
         Task quarkusRemoteDev = tasks.create(QUARKUS_REMOTE_DEV_TASK_NAME, QuarkusRemoteDev.class);
-        tasks.create(QUARKUS_TEST_CONFIG_TASK_NAME, QuarkusTestConfig.class);
+        tasks.create(QUARKUS_TEST_CONFIG_TASK_NAME, QuarkusIdeTestConfigTask.class);
 
         Task buildNative = tasks.create(BUILD_NATIVE_TASK_NAME, DefaultTask.class);
         buildNative.finalizedBy(quarkusBuild);
@@ -103,6 +103,18 @@ public class QuarkusPlugin implements Plugin<Project> {
             t.useJUnitPlatform();
             // quarkusBuild is expected to run after the project has passed the tests
             quarkusBuild.shouldRunAfter(t);
+        };
+
+        final Consumer<QuarkusIdeTestConfigTask> configureIdeTestTask = t -> {
+            // Quarkus test configuration action which should be executed before any IDE Quarkus test
+            // Use anonymous classes in order to leverage task avoidance.
+            t.doFirst(new Action<Task>() {
+                @Override
+                public void execute(Task task) {
+                    quarkusExt.beforeIdeTest(t);
+                }
+            });
+
         };
 
         project.getPlugins().withType(
@@ -148,6 +160,9 @@ public class QuarkusPlugin implements Plugin<Project> {
 
                     tasks.withType(Test.class).forEach(configureTestTask);
                     tasks.withType(Test.class).whenTaskAdded(configureTestTask::accept);
+
+                    tasks.withType(QuarkusIdeTestConfigTask.class).forEach(configureIdeTestTask);
+                    tasks.withType(QuarkusIdeTestConfigTask.class).whenTaskAdded(configureIdeTestTask::accept);
                 });
     }
 

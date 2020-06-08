@@ -146,7 +146,7 @@ public class AppModel implements Serializable {
             return this;
         }
 
-        public Builder addParentFirstArtifacts(List<AppArtifactKey> deps) {
+        public Builder addParentFirstArtifacts(Set<AppArtifactKey> deps) {
             this.parentFirstArtifacts.addAll(deps);
             return this;
         }
@@ -166,7 +166,7 @@ public class AppModel implements Serializable {
             return this;
         }
 
-        public Builder addLesserPriorityArtifacts(List<AppArtifactKey> deps) {
+        public Builder addLesserPriorityArtifacts(Set<AppArtifactKey> deps) {
             this.lesserPriorityArtifacts.addAll(deps);
             return this;
         }

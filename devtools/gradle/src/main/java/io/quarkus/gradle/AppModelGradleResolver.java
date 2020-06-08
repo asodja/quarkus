@@ -48,6 +48,8 @@ import io.quarkus.bootstrap.model.AppModel;
 import io.quarkus.bootstrap.model.PathsCollection;
 import io.quarkus.bootstrap.resolver.AppModelResolver;
 import io.quarkus.bootstrap.resolver.AppModelResolverException;
+import io.quarkus.gradle.ide.ClassesDirModifier;
+import io.quarkus.gradle.ide.GradleInvocation;
 import io.quarkus.gradle.tasks.QuarkusGradleUtils;
 import io.quarkus.runtime.LaunchMode;
 
@@ -57,10 +59,12 @@ public class AppModelGradleResolver implements AppModelResolver {
 
     private final Project project;
     private final LaunchMode launchMode;
+    private final GradleInvocation gradleInvocation;
 
-    public AppModelGradleResolver(Project project, LaunchMode mode) {
+    public AppModelGradleResolver(Project project, LaunchMode mode, GradleInvocation gradleInvocation) {
         this.project = project;
         this.launchMode = mode;
+        this.gradleInvocation = gradleInvocation;
     }
 
     @Override
@@ -238,6 +242,7 @@ public class AppModelGradleResolver implements AppModelResolver {
             Map<ModuleIdentifier, ModuleVersionIdentifier> userModules) {
 
         final ResolvedConfiguration resolvedConfig = config.getResolvedConfiguration();
+        final ClassesDirModifier classesDirModifier = new ClassesDirModifier(gradleInvocation);
         for (ResolvedArtifact a : resolvedConfig.getResolvedArtifacts()) {
             if (!isDependency(a)) {
                 continue;
@@ -248,22 +253,22 @@ public class AppModelGradleResolver implements AppModelResolver {
             final AppArtifactKey artifactGa = new AppArtifactKey(dependency.getArtifact().getGroupId(),
                     dependency.getArtifact().getArtifactId());
 
-            // If we are running in dev mode we prefer directories of classes and resources over the JARs
-            // for local project dependencies
-            if (LaunchMode.DEVELOPMENT.equals(launchMode)
-                    && (a.getId().getComponentIdentifier() instanceof ProjectComponentIdentifier)) {
+            if (preferDirectoryOverJar(a)) {
                 final Project depProject = project.getRootProject()
                         .findProject(((ProjectComponentIdentifier) a.getId().getComponentIdentifier()).getProjectPath());
                 final JavaPluginConvention javaConvention = depProject.getConvention().findPlugin(JavaPluginConvention.class);
                 if (javaConvention != null) {
                     SourceSet mainSourceSet = javaConvention.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
                     final PathsCollection.Builder paths = PathsCollection.builder();
-                    final Path classesDir = Paths
+                    final Path gradleClassesDir = Paths
                             .get(QuarkusGradleUtils.getClassesDir(mainSourceSet, depProject.getBuildDir(), false));
+                    final Path classesDir = gradleInvocation.isRunFromIde()
+                            ? classesDirModifier.modify(gradleClassesDir)
+                            : gradleClassesDir;
                     if (Files.exists(classesDir)) {
                         paths.add(classesDir);
                     }
-                    for (File resourcesDir : mainSourceSet.getResources().getSourceDirectories()) {
+                    for (File resourcesDir : mainSourceSet.getResources().getSourceDirectories().getFiles()) {
                         if (resourcesDir.exists()) {
                             paths.add(resourcesDir.toPath());
                         }
@@ -282,6 +287,16 @@ public class AppModelGradleResolver implements AppModelResolver {
 
         collectExtensionDeps(resolvedConfig.getFirstLevelModuleDependencies(), versionMap, appBuilder, directExtensionDeps,
                 true, new HashSet<>());
+    }
+
+    private boolean preferDirectoryOverJar(ResolvedArtifact artifact) {
+        // If we are running in dev mode we prefer directories of classes and resources over the JARs
+        // for local project dependencies
+        if (artifact.getId().getComponentIdentifier() instanceof ProjectComponentIdentifier) {
+            return LaunchMode.DEVELOPMENT.equals(launchMode)
+                    || LaunchMode.TEST.equals(launchMode) && gradleInvocation.isRunFromIde();
+        }
+        return false;
     }
 
     private void collectExtensionDeps(Set<ResolvedDependency> resolvedDeps,

@@ -1,5 +1,7 @@
 package io.quarkus.gradle;
 
+import static io.quarkus.gradle.ide.GradleInvocation.GRADLE_RUNNER;
+
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,7 +23,9 @@ import io.quarkus.bootstrap.BootstrapConstants;
 import io.quarkus.bootstrap.model.AppArtifact;
 import io.quarkus.bootstrap.model.AppModel;
 import io.quarkus.bootstrap.resolver.AppModelResolver;
+import io.quarkus.gradle.ide.GradleInvocation;
 import io.quarkus.gradle.tasks.QuarkusGradleUtils;
+import io.quarkus.gradle.tasks.QuarkusIdeTestConfigTask;
 import io.quarkus.runtime.LaunchMode;
 
 public class QuarkusPluginExtension {
@@ -55,6 +59,17 @@ public class QuarkusPluginExtension {
                     .toAbsolutePath()
                     .toString();
             props.put("native.image.path", nativeRunner);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to resolve deployment classpath", e);
+        }
+    }
+
+    void beforeIdeTest(QuarkusIdeTestConfigTask task) {
+        try {
+            final GradleInvocation gradleInvocation = GradleInvocation.of(task.getRunner());
+            final AppModel appModel = getIdeAppModelResolver(LaunchMode.TEST, gradleInvocation)
+                    .resolveModel(getAppArtifact());
+            QuarkusGradleUtils.serializeAppModel(appModel, task);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to resolve deployment classpath", e);
         }
@@ -163,7 +178,11 @@ public class QuarkusPluginExtension {
     }
 
     public AppModelResolver getAppModelResolver(LaunchMode mode) {
-        return new AppModelGradleResolver(project, mode);
+        return new AppModelGradleResolver(project, mode, GRADLE_RUNNER);
+    }
+
+    public AppModelResolver getIdeAppModelResolver(LaunchMode mode, GradleInvocation gradleInvocation) {
+        return new AppModelGradleResolver(project, mode, gradleInvocation);
     }
 
     /**

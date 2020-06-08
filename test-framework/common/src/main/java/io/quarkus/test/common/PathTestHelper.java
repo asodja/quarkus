@@ -22,6 +22,12 @@ public final class PathTestHelper {
         TEST_TO_MAIN_DIR_FRAGMENTS.put(
                 "bin" + File.separator + "test",
                 "bin" + File.separator + "main");
+
+        // intellij
+        TEST_TO_MAIN_DIR_FRAGMENTS.put(
+                "out" + File.separator + "test" + File.separator + "classes",
+                "out" + File.separator + "production" + File.separator + "classes");
+
         // gradle
         TEST_TO_MAIN_DIR_FRAGMENTS.put(
                 "classes" + File.separator + "java" + File.separator + "native-test",
