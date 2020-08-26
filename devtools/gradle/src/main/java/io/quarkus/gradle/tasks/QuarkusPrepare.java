@@ -24,6 +24,7 @@ import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.bootstrap.model.AppArtifact;
 import io.quarkus.bootstrap.resolver.AppModelResolver;
 import io.quarkus.deployment.CodeGenerator;
+import io.quarkus.runtime.LaunchMode;
 
 public class QuarkusPrepare extends QuarkusTask {
 
@@ -43,7 +44,7 @@ public class QuarkusPrepare extends QuarkusTask {
         final AppArtifact appArtifact = extension().getAppArtifact();
         appArtifact.setPaths(QuarkusGradleUtils.getOutputPaths(getProject()));
 
-        final AppModelResolver modelResolver = extension().getAppModelResolver();
+        final AppModelResolver modelResolver = extension().getAppModelResolver(LaunchMode.NORMAL, "quarkusPrepare");
         final Properties realProperties = getBuildSystemProperties(appArtifact);
 
         Path buildDir = getProject().getBuildDir().toPath();

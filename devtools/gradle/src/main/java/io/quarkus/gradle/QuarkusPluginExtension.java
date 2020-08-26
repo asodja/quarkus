@@ -170,16 +170,24 @@ public class QuarkusPluginExtension {
         return new AppModelGradleResolver(project, getQuarkusModel(mode));
     }
 
+    public AppModelResolver getAppModelResolver(LaunchMode mode, String taskName) {
+        return new AppModelGradleResolver(project, getQuarkusModel(mode, taskName));
+    }
+
     public QuarkusModel getQuarkusModel() {
         return getQuarkusModel(LaunchMode.NORMAL);
     }
 
     public QuarkusModel getQuarkusModel(LaunchMode mode) {
-        return create(project, mode);
+        return create(project, mode, null);
     }
 
-    private QuarkusModel create(Project project, LaunchMode mode) {
-        QuarkusModelBuilder builder = new QuarkusModelBuilder();
+    public QuarkusModel getQuarkusModel(LaunchMode mode, String taskName) {
+        return create(project, mode, taskName);
+    }
+
+    private QuarkusModel create(Project project, LaunchMode mode, String taskName) {
+        QuarkusModelBuilder builder = new QuarkusModelBuilder(taskName);
         ModelParameter params = new ModelParameterImpl();
         params.setMode(mode.toString());
         return (QuarkusModel) builder.buildAll(QuarkusModel.class.getName(), params, project);

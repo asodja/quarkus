@@ -32,6 +32,7 @@ import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry;
 import org.gradle.util.GradleVersion;
 
 import io.quarkus.gradle.builder.QuarkusModelBuilder;
+import io.quarkus.gradle.convention.QuarkusDependencyConvention;
 import io.quarkus.gradle.tasks.QuarkusAddExtension;
 import io.quarkus.gradle.tasks.QuarkusBuild;
 import io.quarkus.gradle.tasks.QuarkusDev;
@@ -40,6 +41,7 @@ import io.quarkus.gradle.tasks.QuarkusListExtensions;
 import io.quarkus.gradle.tasks.QuarkusPrepare;
 import io.quarkus.gradle.tasks.QuarkusRemoteDev;
 import io.quarkus.gradle.tasks.QuarkusRemoveExtension;
+import io.quarkus.gradle.tasks.QuarkusResolveDeploymentTask;
 import io.quarkus.gradle.tasks.QuarkusTestConfig;
 import io.quarkus.gradle.tasks.QuarkusTestNative;
 
@@ -81,11 +83,39 @@ public class QuarkusPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
         verifyGradleVersion();
+        registerQuarkusExtensionConfiguration(project);
         registerModel();
         // register extension
         final QuarkusPluginExtension quarkusExt = project.getExtensions().create(EXTENSION_NAME, QuarkusPluginExtension.class,
                 project);
         registerTasks(project, quarkusExt);
+    }
+
+    /**
+     * Example usage:
+     * dependencies {
+     *   implementation quarkusEnforcedPlatform("io.quarkus:quarkus-bom:${quarkusPlatformVersion}")
+     *   implementation 'io.quarkus:quarkus-resteasy-jsonb'
+     *   implementation 'io.quarkus:quarkus-resteasy'
+     * }
+     *
+     * Or:
+     * dependencies {
+     *    implementation enforcedPlatform("io.quarkus:quarkus-bom:${quarkusPlatformVersion}")
+     *    quarkusDeployment enforcedPlatform("io.quarkus:quarkus-bom:${quarkusPlatformVersion}")
+     *    // Note: One could avoid implementation line if we would do: implementation.extends(quarkusDeployment)
+     *    // but this should be
+     *    implementation 'io.quarkus:quarkus-resteasy-jsonb'
+     *    implementation 'io.quarkus:quarkus-resteasy'
+     *  }
+     */
+    private void registerQuarkusExtensionConfiguration(Project project) {
+        // TODO create also quarkusTestDeployment and quarkusDevDeployment configurations
+        Configuration configuration = project.getConfigurations().create("quarkusDeployment");
+        configuration.setCanBeResolved(true);
+        configuration.setCanBeConsumed(false);
+        project.getConvention().getPlugins().put("quarkusConvention",
+                new QuarkusDependencyConvention(project.getDependencies(), configuration));
     }
 
     @SuppressWarnings("Convert2Lambda")
@@ -105,6 +135,8 @@ public class QuarkusPlugin implements Plugin<Project> {
         Task quarkusDev = tasks.create(QUARKUS_DEV_TASK_NAME, QuarkusDev.class);
         Task quarkusRemoteDev = tasks.create(QUARKUS_REMOTE_DEV_TASK_NAME, QuarkusRemoteDev.class);
         tasks.create(QUARKUS_TEST_CONFIG_TASK_NAME, QuarkusTestConfig.class);
+        Task resolveTask = tasks.create("quarkusResolve", QuarkusResolveDeploymentTask.class);
+        tasks.getByName("dependencies").dependsOn(resolveTask);
 
         Task buildNative = tasks.create(BUILD_NATIVE_TASK_NAME, DefaultTask.class);
         buildNative.finalizedBy(quarkusBuild);
