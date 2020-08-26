@@ -81,11 +81,33 @@ public class QuarkusPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
         verifyGradleVersion();
+        registerQuarkusExtensionConfiguration(project);
         registerModel();
         // register extension
         final QuarkusPluginExtension quarkusExt = project.getExtensions().create(EXTENSION_NAME, QuarkusPluginExtension.class,
                 project);
         registerTasks(project, quarkusExt);
+    }
+
+    /**
+     * Example usage:
+     * dependencies {
+     *     quarkusExtension enforcedPlatform("io.quarkus:quarkus-bom:${quarkusPlatformVersion}")
+     *     implementation 'io.quarkus:quarkus-resteasy-jsonb'
+     *     implementation 'io.quarkus:quarkus-resteasy'
+     *
+     *     testImplementation 'io.quarkus:quarkus-junit5'
+     *     testImplementation 'io.rest-assured:rest-assured'
+     * }
+     */
+    private void registerQuarkusExtensionConfiguration(Project project) {
+        project.getPlugins().apply(JavaPlugin.class);
+        Configuration configuration = project.getConfigurations().create("quarkusExtension");
+        configuration.setCanBeResolved(true);
+        configuration.setCanBeConsumed(false);
+        // Make implementation extend quarkusExtension, so quarkusExtension dependencies
+        // are reflected also on implementation and user don't need to specify quarkus bom separately for deployment and runtime
+        project.getConfigurations().getByName(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME).extendsFrom(configuration);
     }
 
     @SuppressWarnings("Convert2Lambda")

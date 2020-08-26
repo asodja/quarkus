@@ -6,7 +6,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -18,12 +17,10 @@ import java.util.Set;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.ResolvedConfiguration;
 import org.gradle.api.artifacts.ResolvedDependency;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
-import org.gradle.api.attributes.Category;
 import org.gradle.api.internal.artifacts.dependencies.DefaultExternalModuleDependency;
 import org.gradle.api.plugins.Convention;
 import org.gradle.api.plugins.JavaPlugin;
@@ -85,16 +82,16 @@ public class QuarkusModelBuilder implements ParameterizedToolingModelBuilder<Mod
     public Object buildAll(String modelName, ModelParameter parameter, Project project) {
         LaunchMode mode = LaunchMode.valueOf(parameter.getMode());
 
-        final Set<org.gradle.api.artifacts.Dependency> deploymentDeps = getEnforcedPlatforms(project);
+        final Configuration quarkusExtensionConfiguration = project.getConfigurations().getByName("quarkusExtension").copy();
         final Map<ArtifactCoords, Dependency> appDependencies = new LinkedHashMap<>();
         final Set<ArtifactCoords> visitedDeps = new HashSet<>();
 
         final ResolvedConfiguration configuration = classpathConfig(project, mode).getResolvedConfiguration();
         collectDependencies(configuration, mode, project, appDependencies);
         collectFirstMetDeploymentDeps(configuration.getFirstLevelModuleDependencies(), appDependencies,
-                deploymentDeps, visitedDeps);
+                quarkusExtensionConfiguration, visitedDeps);
 
-        final List<Dependency> extensionDependencies = collectExtensionDependencies(project, deploymentDeps);
+        final List<Dependency> extensionDependencies = collectExtensionDependencies(project, quarkusExtensionConfiguration);
 
         ArtifactCoords appArtifactCoords = new ArtifactCoordsImpl(project.getGroup().toString(), project.getName(),
                 project.getVersion().toString());
@@ -134,26 +131,8 @@ public class QuarkusModelBuilder implements ParameterizedToolingModelBuilder<Mod
                 project.getBuildDir().getAbsoluteFile(), getSourceSourceSet(mainSourceSet), modelSourceSet);
     }
 
-    private Set<org.gradle.api.artifacts.Dependency> getEnforcedPlatforms(Project project) {
-        final Set<org.gradle.api.artifacts.Dependency> directExtension = new HashSet<>();
-        // collect enforced platforms
-        final Configuration impl = project.getConfigurations()
-                .getByName(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME);
-        for (org.gradle.api.artifacts.Dependency d : impl.getAllDependencies()) {
-            if (!(d instanceof ModuleDependency)) {
-                continue;
-            }
-            final ModuleDependency module = (ModuleDependency) d;
-            final Category category = module.getAttributes().getAttribute(Category.CATEGORY_ATTRIBUTE);
-            if (category != null && Category.ENFORCED_PLATFORM.equals(category.getName())) {
-                directExtension.add(d);
-            }
-        }
-        return directExtension;
-    }
-
     private void collectFirstMetDeploymentDeps(Set<ResolvedDependency> dependencies,
-            Map<ArtifactCoords, Dependency> appDependencies, Set<org.gradle.api.artifacts.Dependency> extensionDeps,
+            Map<ArtifactCoords, Dependency> appDependencies, Configuration extensionDeps,
             Set<ArtifactCoords> visited) {
         for (ResolvedDependency d : dependencies) {
             ArtifactCoords key = new ArtifactCoordsImpl(d.getModuleGroup(), d.getModuleName(), "");
@@ -169,7 +148,7 @@ public class QuarkusModelBuilder implements ParameterizedToolingModelBuilder<Mod
 
             boolean addChildExtension = true;
             if (deploymentArtifact != null && addChildExtension) {
-                extensionDeps.add(deploymentArtifact);
+                extensionDeps.getDependencies().add(deploymentArtifact);
                 addChildExtension = false;
             }
 
@@ -214,12 +193,10 @@ public class QuarkusModelBuilder implements ParameterizedToolingModelBuilder<Mod
     }
 
     private List<Dependency> collectExtensionDependencies(Project project,
-            Collection<org.gradle.api.artifacts.Dependency> extensions) {
+            Configuration extensions) {
         final List<Dependency> platformDependencies = new LinkedList<>();
 
-        final Configuration deploymentConfig = project.getConfigurations()
-                .detachedConfiguration(extensions.toArray(new org.gradle.api.artifacts.Dependency[0]));
-        final ResolvedConfiguration rc = deploymentConfig.getResolvedConfiguration();
+        final ResolvedConfiguration rc = extensions.getResolvedConfiguration();
         for (ResolvedArtifact a : rc.getResolvedArtifacts()) {
             if (!isDependency(a)) {
                 continue;
